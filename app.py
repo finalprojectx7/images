@@ -6,43 +6,48 @@ from PIL import Image
 import io
 import torch.nn.functional as F
 import os
-import gdown  # 🔥 مهم
+import gdown
 
 app = FastAPI()
 
+# =========================
 # 🔥 رابط الموديل
+# =========================
 MODEL_URL = "https://drive.google.com/uc?id=10zAXshLCaBI0up4NG1z_zbiHCmO3LCYg"
 MODEL_PATH = "model.pth"
 
 # =========================
-# 🔥 تحميل الموديل (صح)
+# 🔥 تحميل الموديل
 # =========================
 if not os.path.exists(MODEL_PATH):
     print("Downloading model...")
-    gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+    gdown.download(MODEL_URL, MODEL_PATH, quiet=False, fuzzy=True)
     print("Model downloaded ✅")
 
 # =========================
-# 🔥 تحميل الموديل
+# 🔥 إنشاء الموديل
 # =========================
-model = models.resnet50(weights=None)  # بدل pretrained
+model = models.resnet50(weights=None)
 model.fc = nn.Linear(model.fc.in_features, 5)
 
+# =========================
+# 🔥 تحميل الـ checkpoint صح
+# =========================
 checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-model.load_state_dict(checkpoint)
+
+# 🔥 دي أهم نقطة (حل المشكلة بتاعتك)
+model.load_state_dict(checkpoint["model_state_dict"])
 
 model.eval()
 
-# =========================
-# 🔥 أسماء الكلاسات
-# =========================
-class_names = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Normal']
+# 🔥 الكلاسات من الموديل نفسه
+class_names = checkpoint["class_names"]
 
 # =========================
 # 🔥 transforms
 # =========================
 transform = transforms.Compose([
-    transforms.Resize((224,224)),
+    transforms.Resize((224, 224)),
     transforms.ToTensor(),
 ])
 
