@@ -3,6 +3,7 @@ uvicorn
 pillow
 requests
 gdown
+python-multipart
 numpy<2
 
 --extra-index-url https://download.pytorch.org/whl/cpu
