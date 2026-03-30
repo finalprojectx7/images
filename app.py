@@ -13,7 +13,7 @@ app = FastAPI()
 # =========================
 # 🔥 رابط الموديل
 # =========================
-MODEL_URL = "https://drive.google.com/uc?id=10zAXshLCaBI0up4NG1z_zbiHCmO3LCYg"
+MODEL_URL = "https://drive.google.com/uc?id=1U10r0RQZF1Sj7lTmHVW4A3zMeYn0QKAu"
 MODEL_PATH = "model.pth"
 
 # =========================
