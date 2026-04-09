@@ -31,13 +31,13 @@ model = models.resnet50(weights=None)
 model.fc = nn.Linear(model.fc.in_features, 5)
 
 # =========================
-# 🔥 تحميل الـ checkpoint صح
+# 🔥 تحميل الـ checkpoint
 # =========================
 checkpoint = torch.load(MODEL_PATH, map_location="cpu")
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
 
-# 🔥 الكلاسات من الموديل نفسه
+# 🔥 الكلاسات
 class_names = checkpoint["class_names"]
 
 # =========================
@@ -69,26 +69,36 @@ async def predict(file: UploadFile = File(...)):
         top2 = sorted_probs.values[0][1].item()
 
     # =========================
-    # 🔥 الشروط الذكية
+    # 🔥 Logic ذكي (مناسب للموديل)
     # =========================
-    THRESHOLD = 0.4   # أقل عشان موديلك confidence قليل
-    MARGIN = 0.15     # الفرق بين أول وتاني احتمال
 
-    # ❌ لو مش واثق
+    THRESHOLD = 0.45   # أقل شوية علشان موديلك ضعيف نسبيًا
+    MARGIN = 0.20      # لازم يكون الفرق واضح
+
+    # ❌ لو confidence ضعيف
     if confidence_value < THRESHOLD:
         return {
             "prediction": "Undefined",
             "confidence": confidence_value
         }
 
-    # ❌ لو محتار
+    # ❌ لو الموديل محتار
     if (top1 - top2) < MARGIN:
         return {
             "prediction": "Undefined",
             "confidence": confidence_value
         }
 
-    # ✅ الحالة الطبيعية
+    # ❌ لو مش Normal وconfidence مش عالي
+    if pred.item() != class_names.index("Normal") and confidence_value < 0.6:
+        return {
+            "prediction": "Undefined",
+            "confidence": confidence_value
+        }
+
+    # =========================
+    # ✅ النتيجة النهائية
+    # =========================
     return {
         "prediction": class_names[pred.item()],
         "confidence": confidence_value
