@@ -63,41 +63,33 @@ async def predict(file: UploadFile = File(...)):
         confidence, pred = torch.max(probs, 1)
         confidence_value = float(confidence.item())
 
-        # 🔥 أعلى احتمالين
         sorted_probs = torch.sort(probs, descending=True)
         top1 = sorted_probs.values[0][0].item()
         top2 = sorted_probs.values[0][1].item()
 
     # =========================
-    # 🔥 Logic ذكي (مناسب للموديل)
+    # 🔥 Logic متوازن
     # =========================
 
-    THRESHOLD = 0.45   # أقل شوية علشان موديلك ضعيف نسبيًا
-    MARGIN = 0.20      # لازم يكون الفرق واضح
+    THRESHOLD = 0.3   # مهم جدًا ↓ (علشان موديلك ضعيف)
+    MARGIN = 0.08     # فرق صغير
 
-    # ❌ لو confidence ضعيف
+    # ❌ لو ضعيف جدًا
     if confidence_value < THRESHOLD:
         return {
             "prediction": "Undefined",
             "confidence": confidence_value
         }
 
-    # ❌ لو الموديل محتار
+    # ❌ لو محتار جدًا
     if (top1 - top2) < MARGIN:
         return {
             "prediction": "Undefined",
             "confidence": confidence_value
         }
 
-    # ❌ لو مش Normal وconfidence مش عالي
-    if pred.item() != class_names.index("Normal") and confidence_value < 0.6:
-        return {
-            "prediction": "Undefined",
-            "confidence": confidence_value
-        }
-
     # =========================
-    # ✅ النتيجة النهائية
+    # ✅ النتيجة
     # =========================
     return {
         "prediction": class_names[pred.item()],
