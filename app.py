@@ -61,20 +61,34 @@ async def predict(file: UploadFile = File(...)):
         probs = F.softmax(output, dim=1)
 
         confidence, pred = torch.max(probs, 1)
-
         confidence_value = float(confidence.item())
 
-    # =========================
-    # 🔥 الحل هنا (Undefined)
-    # =========================
-    THRESHOLD = 0.6
+        # 🔥 أعلى احتمالين
+        sorted_probs = torch.sort(probs, descending=True)
+        top1 = sorted_probs.values[0][0].item()
+        top2 = sorted_probs.values[0][1].item()
 
+    # =========================
+    # 🔥 الشروط الذكية
+    # =========================
+    THRESHOLD = 0.4   # أقل عشان موديلك confidence قليل
+    MARGIN = 0.15     # الفرق بين أول وتاني احتمال
+
+    # ❌ لو مش واثق
     if confidence_value < THRESHOLD:
         return {
             "prediction": "Undefined",
             "confidence": confidence_value
         }
 
+    # ❌ لو محتار
+    if (top1 - top2) < MARGIN:
+        return {
+            "prediction": "Undefined",
+            "confidence": confidence_value
+        }
+
+    # ✅ الحالة الطبيعية
     return {
         "prediction": class_names[pred.item()],
         "confidence": confidence_value
