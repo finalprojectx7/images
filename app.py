@@ -34,10 +34,7 @@ model.fc = nn.Linear(model.fc.in_features, 5)
 # 🔥 تحميل الـ checkpoint صح
 # =========================
 checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-
-# 🔥 دي أهم نقطة (حل المشكلة بتاعتك)
 model.load_state_dict(checkpoint["model_state_dict"])
-
 model.eval()
 
 # 🔥 الكلاسات من الموديل نفسه
@@ -65,7 +62,20 @@ async def predict(file: UploadFile = File(...)):
 
         confidence, pred = torch.max(probs, 1)
 
+        confidence_value = float(confidence.item())
+
+    # =========================
+    # 🔥 الحل هنا (Undefined)
+    # =========================
+    THRESHOLD = 0.6
+
+    if confidence_value < THRESHOLD:
+        return {
+            "prediction": "Undefined",
+            "confidence": confidence_value
+        }
+
     return {
         "prediction": class_names[pred.item()],
-        "confidence": float(confidence.item())
+        "confidence": confidence_value
     }
