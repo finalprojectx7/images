@@ -11,9 +11,9 @@ import gdown
 app = FastAPI()
 
 # =========================
-# 🔥 رابط الموديل
+# 🔥 رابط الموديل الجديد
 # =========================
-MODEL_URL = "https://drive.google.com/uc?id=1U10r0RQZF1Sj7lTmHVW4A3zMeYn0QKAu"
+MODEL_URL = "https://drive.google.com/uc?id=1wgQSkAcDPGTmNtlMx_BF3Js7x05MLD9u"
 MODEL_PATH = "model.pth"
 
 # =========================
@@ -25,26 +25,31 @@ if not os.path.exists(MODEL_PATH):
     print("Model downloaded ✅")
 
 # =========================
-# 🔥 إنشاء الموديل
+# 🔥 إنشاء الموديل (EfficientNet B3)
 # =========================
-model = models.resnet50(weights=None)
-model.fc = nn.Linear(model.fc.in_features, 5)
+model = models.efficientnet_b3(weights=None)
+
+model.classifier = nn.Sequential(
+    nn.Dropout(0.3),
+    nn.Linear(model.classifier[1].in_features, 5)
+)
 
 # =========================
 # 🔥 تحميل الـ checkpoint
 # =========================
 checkpoint = torch.load(MODEL_PATH, map_location="cpu")
+
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
 
 # 🔥 الكلاسات
-class_names = checkpoint["class_names"]
+class_names = checkpoint["classes"]
 
 # =========================
-# 🔥 transforms
+# 🔥 transforms (نفس التدريب)
 # =========================
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((300, 300)),
     transforms.ToTensor(),
 ])
 
@@ -68,24 +73,26 @@ async def predict(file: UploadFile = File(...)):
         top2 = sorted_probs.values[0][1].item()
 
     # =========================
-    # 🔥 Logic متوازن
+    # 🔥 Undefined System (احترافي)
     # =========================
 
-    THRESHOLD = 0.3   # مهم جدًا ↓ (علشان موديلك ضعيف)
-    MARGIN = 0.08     # فرق صغير
+    THRESHOLD = 0.65   # متوازن
+    MARGIN = 0.20      # فرق واضح
 
-    # ❌ لو ضعيف جدًا
+    # ❌ لو مش واثق
     if confidence_value < THRESHOLD:
         return {
             "prediction": "Undefined",
-            "confidence": confidence_value
+            "confidence": confidence_value,
+            "reason": "Low confidence"
         }
 
-    # ❌ لو محتار جدًا
+    # ❌ لو محتار بين كلاسين
     if (top1 - top2) < MARGIN:
         return {
             "prediction": "Undefined",
-            "confidence": confidence_value
+            "confidence": confidence_value,
+            "reason": "Model confused between classes"
         }
 
     # =========================
