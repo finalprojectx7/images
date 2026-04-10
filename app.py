@@ -11,7 +11,7 @@ import gdown
 app = FastAPI()
 
 # =========================
-# 🔥 رابط الموديل الجديد
+# 🔥 رابط الموديل
 # =========================
 MODEL_URL = "https://drive.google.com/uc?id=1wgQSkAcDPGTmNtlMx_BF3Js7x05MLD9u"
 MODEL_PATH = "model.pth"
@@ -35,7 +35,7 @@ model.classifier = nn.Sequential(
 )
 
 # =========================
-# 🔥 تحميل الـ checkpoint
+# 🔥 تحميل الموديل
 # =========================
 checkpoint = torch.load(MODEL_PATH, map_location="cpu")
 
@@ -46,7 +46,7 @@ model.eval()
 class_names = checkpoint["classes"]
 
 # =========================
-# 🔥 transforms (نفس التدريب)
+# 🔥 transforms
 # =========================
 transform = transforms.Compose([
     transforms.Resize((300, 300)),
@@ -73,13 +73,18 @@ async def predict(file: UploadFile = File(...)):
         top2 = sorted_probs.values[0][1].item()
 
     # =========================
-    # 🔥 Undefined System (احترافي)
+    # 🔥 Debug (مهم تشوف القيم)
     # =========================
+    print("Confidence:", confidence_value)
+    print("Top1:", top1, "Top2:", top2)
 
-    THRESHOLD = 0.65   # متوازن
-    MARGIN = 0.20      # فرق واضح
+    # =========================
+    # 🔥 Undefined System (متظبط)
+    # =========================
+    THRESHOLD = 0.5   # متوازن مع موديلك
+    MARGIN = 0.10     # فرق منطقي
 
-    # ❌ لو مش واثق
+    # ❌ لو مش واثق خالص
     if confidence_value < THRESHOLD:
         return {
             "prediction": "Undefined",
@@ -87,12 +92,12 @@ async def predict(file: UploadFile = File(...)):
             "reason": "Low confidence"
         }
 
-    # ❌ لو محتار بين كلاسين
+    # ❌ لو محتار بين كلاسز
     if (top1 - top2) < MARGIN:
         return {
             "prediction": "Undefined",
             "confidence": confidence_value,
-            "reason": "Model confused between classes"
+            "reason": "Model confused"
         }
 
     # =========================
