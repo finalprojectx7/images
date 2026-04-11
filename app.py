@@ -13,7 +13,7 @@ app = FastAPI()
 # =========================
 # 🔥 رابط الموديل
 # =========================
-MODEL_URL = "https://drive.google.com/uc?id=1wgQSkAcDPGTmNtlMx_BF3Js7x05MLD9u"
+MODEL_URL = "https://drive.google.com/uc?id=1U10r0RQZF1Sj7lTmHVW4A3zMeYn0QKAu"
 MODEL_PATH = "model.pth"
 
 # =========================
@@ -25,31 +25,26 @@ if not os.path.exists(MODEL_PATH):
     print("Model downloaded ✅")
 
 # =========================
-# 🔥 إنشاء الموديل (EfficientNet B3)
+# 🔥 إنشاء الموديل
 # =========================
-model = models.efficientnet_b3(weights=None)
-
-model.classifier = nn.Sequential(
-    nn.Dropout(0.3),
-    nn.Linear(model.classifier[1].in_features, 5)
-)
+model = models.resnet50(weights=None)
+model.fc = nn.Linear(model.fc.in_features, 5)
 
 # =========================
-# 🔥 تحميل الموديل
+# 🔥 تحميل الـ checkpoint صح
 # =========================
 checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
 
-# 🔥 الكلاسات
-class_names = checkpoint["classes"]
+# 🔥 الكلاسات من الموديل نفسه
+class_names = checkpoint["class_names"]
 
 # =========================
 # 🔥 transforms
 # =========================
 transform = transforms.Compose([
-    transforms.Resize((300, 300)),
+    transforms.Resize((224, 224)),
     transforms.ToTensor(),
 ])
 
@@ -66,43 +61,20 @@ async def predict(file: UploadFile = File(...)):
         probs = F.softmax(output, dim=1)
 
         confidence, pred = torch.max(probs, 1)
+
         confidence_value = float(confidence.item())
 
-        sorted_probs = torch.sort(probs, descending=True)
-        top1 = sorted_probs.values[0][0].item()
-        top2 = sorted_probs.values[0][1].item()
+    # =========================
+    # 🔥 الحل هنا (Undefined)
+    # =========================
+    THRESHOLD = 0.6
 
-    # =========================
-    # 🔥 Debug (مهم تشوف القيم)
-    # =========================
-    print("Confidence:", confidence_value)
-    print("Top1:", top1, "Top2:", top2)
-
-    # =========================
-    # 🔥 Undefined System (متظبط)
-    # =========================
-    THRESHOLD = 0.5   # متوازن مع موديلك
-    MARGIN = 0.10     # فرق منطقي
-
-    # ❌ لو مش واثق خالص
     if confidence_value < THRESHOLD:
         return {
             "prediction": "Undefined",
-            "confidence": confidence_value,
-            "reason": "Low confidence"
+            "confidence": confidence_value
         }
 
-    # ❌ لو محتار بين كلاسز
-    if (top1 - top2) < MARGIN:
-        return {
-            "prediction": "Undefined",
-            "confidence": confidence_value,
-            "reason": "Model confused"
-        }
-
-    # =========================
-    # ✅ النتيجة
-    # =========================
     return {
         "prediction": class_names[pred.item()],
         "confidence": confidence_value
