@@ -1,9 +1,9 @@
-fastapi
-uvicorn
-pillow
-numpy<2
-opencv-python-headless
-python-multipart
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+pillow==10.3.0
+numpy==1.26.4
+opencv-python-headless==4.9.0.80
+python-multipart==0.0.9
 gdown==4.6.3
 tensorflow-cpu==2.15.0
-h5py
+h5py==3.10.0
