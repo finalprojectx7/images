@@ -1,10 +1,14 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import os
+
+# 🔥 حل مشكلة keras.src
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+
 import tensorflow as tf
 import numpy as np
 import cv2
 import io
-import os
 import gdown
 from PIL import Image
 
@@ -23,20 +27,20 @@ app.add_middleware(
 # =========================
 # 🔥 Model Config
 # =========================
-MODEL_URL = "https://drive.google.com/uc?id=1rCDRAf5HUiZdl8hdUUTe1WfhZGTdiTdX"
-MODEL_PATH = "best_model_finetune.keras"
+MODEL_URL  = "https://drive.google.com/uc?id=1TMUub0CxlvumUkEuPYgA27H1N47KN-YZ"
+MODEL_PATH = "dfu_model_final.h5"
 
 CLASS_NAMES = ['Healthy', 'Grade1', 'Grade2', 'Grade3', 'Grade4']
 IMG_SIZE    = 224
 THRESHOLD   = 0.60
 
 # =========================
-# 🔥 Load Model (مرة واحدة بس)
+# 🔥 Load Model
 # =========================
 def load_model():
     if not os.path.isfile(MODEL_PATH):
         print("⬇ Downloading model...")
-        gdown.download(url=MODEL_URL, output=MODEL_PATH, quiet=False)
+        gdown.download(url=MODEL_URL, output=MODEL_PATH, quiet=False, fuzzy=True)
         print("✅ Model downloaded")
 
     model = tf.keras.models.load_model(MODEL_PATH, compile=False)
@@ -98,7 +102,6 @@ async def predict(file: UploadFile = File(...)):
     try:
         contents = await file.read()
 
-        # حماية من الصور الكبيرة جدًا
         if len(contents) > 5 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Image too large")
 
@@ -108,9 +111,6 @@ async def predict(file: UploadFile = File(...)):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image")
 
-    # =========================
-    # 1️⃣ Skin Check
-    # =========================
     is_skin, skin_ratio = is_foot_image(img_array)
 
     if not is_skin:
@@ -122,9 +122,6 @@ async def predict(file: UploadFile = File(...)):
             "message": "الصورة ليست قدم"
         }
 
-    # =========================
-    # 2️⃣ Prediction
-    # =========================
     img_processed = preprocess_image(img_array)
 
     preds = model(img_processed, training=False).numpy()[0]
@@ -133,9 +130,6 @@ async def predict(file: UploadFile = File(...)):
     pred_index = int(np.argmax(preds))
     pred_class = CLASS_NAMES[pred_index]
 
-    # =========================
-    # 3️⃣ Uncertainty
-    # =========================
     top2 = np.sort(preds)[-2:]
 
     if (top2[1] - top2[0]) < 0.10:
@@ -147,9 +141,6 @@ async def predict(file: UploadFile = File(...)):
             "message": "الموديل غير متأكد"
         }
 
-    # =========================
-    # 4️⃣ Threshold
-    # =========================
     if confidence < THRESHOLD:
         return {
             "status": "uncertain",
@@ -159,9 +150,6 @@ async def predict(file: UploadFile = File(...)):
             "message": "الثقة منخفضة"
         }
 
-    # =========================
-    # ✅ Final Response
-    # =========================
     return {
         "status": "ok",
         "prediction": pred_class,
