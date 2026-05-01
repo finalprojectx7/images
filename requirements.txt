@@ -1,8 +1,9 @@
 fastapi
 uvicorn
 pillow
-numpy
+numpy<2
 opencv-python-headless
 python-multipart
 gdown==4.6.3
 tensorflow-cpu==2.15.0
+h5py
