@@ -26,7 +26,7 @@ app.add_middleware(
 # =========================
 # 🔥 Model Config
 # =========================
-MODEL_URL  = "https://drive.google.com/uc?id=1TMUub0CxlvumUkEuPYgA27H1N47KN-YZ"
+MODEL_URL  = "https://drive.google.com/file/d/1U_yALQDMHepzu-B3J7Wq5DSbLzZVrBy5"
 MODEL_PATH = "dfu_model_final.h5"
 
 CLASS_NAMES = ['Healthy', 'Grade1', 'Grade2', 'Grade3', 'Grade4']
