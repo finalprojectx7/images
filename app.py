@@ -154,8 +154,4 @@ async def predict(file: UploadFile = File(...)):
         "prediction": pred_class,
         "confidence": round(confidence, 3),
         "skin_ratio": round(skin_ratio, 3),
-        "probs": {
-            CLASS_NAMES[i]: round(float(preds[i]), 3)
-            for i in range(len(CLASS_NAMES))
-        }
     }
