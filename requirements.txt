@@ -3,6 +3,6 @@ uvicorn
 pillow
 numpy
 opencv-python-headless
-gdown
 python-multipart
+gdown==4.6.3
 tensorflow-cpu==2.15.0
