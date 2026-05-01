@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
 import numpy as np
@@ -11,7 +11,7 @@ from PIL import Image
 app = FastAPI()
 
 # =========================
-# 🔥 CORS (Flutter)
+# 🔥 CORS
 # =========================
 app.add_middleware(
     CORSMiddleware,
@@ -21,38 +21,34 @@ app.add_middleware(
 )
 
 # =========================
-# 🔥 رابط الموديل (مهم جدًا)
+# 🔥 Model Config
 # =========================
-MODEL_URL  = "https://drive.google.com/uc?id=1rCDRAf5HUiZdl8hdUUTe1WfhZGTdiTdX"
+MODEL_URL = "https://drive.google.com/uc?id=1rCDRAf5HUiZdl8hdUUTe1WfhZGTdiTdX"
 MODEL_PATH = "best_model_finetune.keras"
 
-# =========================
-# 🔥 تحميل الموديل
-# =========================
-if not os.path.isfile(MODEL_PATH):
-    print("Downloading model...")
-    gdown.download(url=MODEL_URL, output=MODEL_PATH, quiet=False)
-    print("Model downloaded ✅")
-
-# =========================
-# 🔥 تحميل الموديل
-# =========================
-model = tf.keras.models.load_model(
-    MODEL_PATH,
-    compile=False
-)
-print("Model loaded ✅")
-
-# 🔥 Warmup (يساعد السرعة)
-dummy = np.zeros((1, 224, 224, 3), dtype=np.float32)
-model(dummy)
-
-# =========================
-# 🔥 إعدادات
-# =========================
 CLASS_NAMES = ['Healthy', 'Grade1', 'Grade2', 'Grade3', 'Grade4']
 IMG_SIZE    = 224
-THRESHOLD   = 0.55   # متوازن
+THRESHOLD   = 0.60
+
+# =========================
+# 🔥 Load Model (مرة واحدة بس)
+# =========================
+def load_model():
+    if not os.path.isfile(MODEL_PATH):
+        print("⬇ Downloading model...")
+        gdown.download(url=MODEL_URL, output=MODEL_PATH, quiet=False)
+        print("✅ Model downloaded")
+
+    model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+    print("✅ Model loaded")
+
+    # Warmup
+    dummy = np.zeros((1, IMG_SIZE, IMG_SIZE, 3), dtype=np.float32)
+    model(dummy)
+
+    return model
+
+model = load_model()
 
 # =========================
 # 🔥 Skin Detection
@@ -76,7 +72,7 @@ def is_foot_image(img_array, skin_threshold=0.25):
     return skin_ratio >= skin_threshold, float(skin_ratio)
 
 # =========================
-# 🔥 Preprocessing
+# 🔥 Preprocess
 # =========================
 def preprocess_image(img_array):
     from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
@@ -89,22 +85,31 @@ def preprocess_image(img_array):
     return img
 
 # =========================
-# 🔥 Endpoints
+# 🔥 Routes
 # =========================
 
 @app.get("/")
 def root():
-    return {"message": "DFU API Running 🔥"}
+    return {"status": "API is running 🚀"}
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
-    contents  = await file.read()
-    pil_image = Image.open(io.BytesIO(contents)).convert("RGB")
-    img_array = np.array(pil_image)
+    try:
+        contents = await file.read()
+
+        # حماية من الصور الكبيرة جدًا
+        if len(contents) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image too large")
+
+        pil_image = Image.open(io.BytesIO(contents)).convert("RGB")
+        img_array = np.array(pil_image)
+
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image")
 
     # =========================
-    # 1️⃣ Skin Detection
+    # 1️⃣ Skin Check
     # =========================
     is_skin, skin_ratio = is_foot_image(img_array)
 
@@ -114,7 +119,7 @@ async def predict(file: UploadFile = File(...)):
             "prediction": "Not a foot",
             "confidence": 0.0,
             "skin_ratio": round(skin_ratio, 3),
-            "message": "الصورة مش قدم"
+            "message": "الصورة ليست قدم"
         }
 
     # =========================
@@ -122,7 +127,6 @@ async def predict(file: UploadFile = File(...)):
     # =========================
     img_processed = preprocess_image(img_array)
 
-    # أسرع من predict
     preds = model(img_processed, training=False).numpy()[0]
 
     confidence = float(np.max(preds))
@@ -130,7 +134,7 @@ async def predict(file: UploadFile = File(...)):
     pred_class = CLASS_NAMES[pred_index]
 
     # =========================
-    # 3️⃣ Confusion check
+    # 3️⃣ Uncertainty
     # =========================
     top2 = np.sort(preds)[-2:]
 
@@ -140,7 +144,7 @@ async def predict(file: UploadFile = File(...)):
             "prediction": "Undefined",
             "confidence": round(confidence, 3),
             "skin_ratio": round(skin_ratio, 3),
-            "message": "الموديل محتار"
+            "message": "الموديل غير متأكد"
         }
 
     # =========================
@@ -152,11 +156,11 @@ async def predict(file: UploadFile = File(...)):
             "prediction": "Undefined",
             "confidence": round(confidence, 3),
             "skin_ratio": round(skin_ratio, 3),
-            "message": "الثقة قليلة"
+            "message": "الثقة منخفضة"
         }
 
     # =========================
-    # ✅ Final
+    # ✅ Final Response
     # =========================
     return {
         "status": "ok",
