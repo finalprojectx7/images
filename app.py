@@ -21,8 +21,11 @@ app.add_middleware(
 # =========================
 # 🔥 رابط الموديل على Drive
 # =========================
-MODEL_URL  = "https://drive.google.com/uc?id=1rCDRAf5HUiZdl8hdUUTe1WfhZGTdiTdX"
-MODEL_PATH = "dfu_model_final.keras"
+# السطر 1
+MODEL_URL  = "https://drive.google.com/file/d/1TMUub0CxlvumUkEuPYgA27H1N47KN-YZ/view?usp=sharing"
+
+# السطر 2  
+MODEL_PATH = "dfu_model_final.h5"
 
 # =========================
 # 🔥 تحميل الموديل
