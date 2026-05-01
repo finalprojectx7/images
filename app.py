@@ -29,7 +29,7 @@ MODEL_PATH = "dfu_model_final.keras"
 # =========================
 if not os.path.exists(MODEL_PATH):
     print("Downloading model...")
-    gdown.download(MODEL_URL, MODEL_PATH, quiet=False, fuzzy=True)
+    gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
     print("Model downloaded ✅")
 
 model = tf.keras.models.load_model(MODEL_PATH)
