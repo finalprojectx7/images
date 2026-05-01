@@ -22,10 +22,10 @@ app.add_middleware(
 # 🔥 رابط الموديل على Drive
 # =========================
 # السطر 1
-MODEL_URL  = "https://drive.google.com/file/d/1TMUub0CxlvumUkEuPYgA27H1N47KN-YZ/view?usp=sharing"
+MODEL_URL  = "https://drive.google.com/file/d/1rCDRAf5HUiZdl8hdUUTe1WfhZGTdiTdX/view?usp=sharing"
 
 # السطر 2  
-MODEL_PATH = "dfu_model_final.h5"
+MODEL_PATH = "best_model_finetune.keras"
 
 # =========================
 # 🔥 تحميل الموديل
