@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 # 🔥 حل مشكلة keras.src
-os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 import tensorflow as tf
 import numpy as np
