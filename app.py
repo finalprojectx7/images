@@ -37,7 +37,10 @@ if not os.path.isfile(MODEL_PATH):
 # =========================
 # 🔥 تحميل الموديل
 # =========================
-model = tf.keras.models.load_model(MODEL_PATH)
+model = tf.keras.models.load_model(
+    MODEL_PATH,
+    compile=False
+)
 print("Model loaded ✅")
 
 # 🔥 Warmup (يساعد السرعة)
