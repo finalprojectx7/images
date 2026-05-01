@@ -1,125 +1,129 @@
 from fastapi import FastAPI, File, UploadFile
-import torch
-import torch.nn as nn
-from torchvision import models, transforms
-from PIL import Image
+from fastapi.middleware.cors import CORSMiddleware
+import tensorflow as tf
+import numpy as np
+import cv2
 import io
-import torch.nn.functional as F
 import os
 import gdown
+from PIL import Image
 
 app = FastAPI()
 
-# =========================
-# Model Link
-# =========================
-MODEL_URL = "https://drive.google.com/uc?id=1U10r0RQZF1Sj7lTmHVW4A3zMeYn0QKAu"
-MODEL_PATH = "model.pth"
+# CORS عشان Flutter يقدر يكلم الـ API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # =========================
-# Download model
+# 🔥 رابط الموديل على Drive
+# =========================
+MODEL_URL  = "https://drive.google.com/uc?id=1rCDRAf5HUiZdl8hdUUTe1WfhZGTdiTdX"
+MODEL_PATH = "dfu_model_final.keras"
+
+# =========================
+# 🔥 تحميل الموديل
 # =========================
 if not os.path.exists(MODEL_PATH):
     print("Downloading model...")
-    gdown.download(
-        url=MODEL_URL,
-        output=MODEL_PATH,
-        quiet=False
-    )
+    gdown.download(MODEL_URL, MODEL_PATH, quiet=False, fuzzy=True)
     print("Model downloaded ✅")
 
+model = tf.keras.models.load_model(MODEL_PATH)
+print("Model loaded ✅")
 
 # =========================
-# Load model
+# 🔥 الإعدادات
 # =========================
-model = models.resnet50(weights=None)
-model.fc = nn.Linear(model.fc.in_features, 5)
-
-checkpoint = torch.load(
-    MODEL_PATH,
-    map_location="cpu"
-)
-
-model.load_state_dict(
-    checkpoint["model_state_dict"]
-)
-
-model.eval()
-
-class_names = checkpoint["class_names"]
-
+CLASS_NAMES = ['Healthy', 'Grade1', 'Grade2', 'Grade3', 'Grade4']
+IMG_SIZE    = 224
+THRESHOLD   = 0.60
 
 # =========================
-# Image preprocessing
+# 🔥 Skin Detection
 # =========================
-transform = transforms.Compose([
-    transforms.Resize((224,224)),
-    transforms.ToTensor()
-])
+def is_foot_image(img_array, skin_threshold=0.25):
+    img_ycrcb  = cv2.cvtColor(img_array, cv2.COLOR_RGB2YCrCb)
+    lower_ycc  = np.array([0,   133, 77],  dtype=np.uint8)
+    upper_ycc  = np.array([255, 173, 127], dtype=np.uint8)
+    mask_ycrcb = cv2.inRange(img_ycrcb, lower_ycc, upper_ycc)
 
+    img_bgr   = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    img_hsv   = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    lower_hsv = np.array([0,  15,  50],  dtype=np.uint8)
+    upper_hsv = np.array([25, 200, 255], dtype=np.uint8)
+    mask_hsv  = cv2.inRange(img_hsv, lower_hsv, upper_hsv)
+
+    combined   = cv2.bitwise_and(mask_ycrcb, mask_hsv)
+    skin_ratio = np.sum(combined > 0) / (img_array.shape[0] * img_array.shape[1])
+
+    return skin_ratio >= skin_threshold, float(skin_ratio)
 
 # =========================
-# Health check
+# 🔥 Preprocessing
 # =========================
+def preprocess_image(img_array):
+    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+    img = cv2.resize(img_array, (IMG_SIZE, IMG_SIZE))
+    img = img.astype(np.float32)
+    img = preprocess_input(img)
+    img = np.expand_dims(img, axis=0)
+    return img
+
+# =========================
+# 🔥 API Endpoints
+# =========================
+
 @app.get("/")
-def home():
-    return {
-        "status":"API Running"
-    }
+def root():
+    return {"message": "DFU API is running ✅"}
 
-
-# =========================
-# Prediction endpoint
-# =========================
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
-    image = Image.open(
-        io.BytesIO(await file.read())
-    ).convert("RGB")
+    contents  = await file.read()
+    pil_image = Image.open(io.BytesIO(contents)).convert("RGB")
+    img_array = np.array(pil_image)
 
-    img = transform(image).unsqueeze(0)
+    # === خطوة 1: Skin Detection ===
+    is_skin, skin_ratio = is_foot_image(img_array)
 
-    with torch.no_grad():
-
-        output = model(img)
-
-        probs = F.softmax(
-            output,
-            dim=1
-        )
-
-        confidence, pred = torch.max(
-            probs,
-            1
-        )
-
-        confidence_value = float(
-            confidence.item()
-        )
-
-        # أعلى احتمالين
-        top2 = torch.topk(
-            probs,
-            2
-        ).values[0]
-
-    # =========================
-    # Undefined only if confused
-    # =========================
-    MARGIN = 0.10
-
-    if (top2[0]-top2[1]).item() < MARGIN:
+    if not is_skin:
         return {
-            "prediction":"Undefined",
-            "confidence":confidence_value,
-            "reason":"Model confused"
+            "status"    : "rejected",
+            "prediction": "Not a foot image",
+            "message"   : "الصورة مش صورة قدم — صوّر القدم بشكل واضح",
+            "confidence": 0.0,
+            "skin_ratio": round(skin_ratio, 3)
         }
 
-    # =========================
-    # Final prediction
-    # =========================
+    # === خطوة 2: موديل DFU ===
+    img_processed = preprocess_image(img_array)
+    preds         = model.predict(img_processed, verbose=0)[0]
+    confidence    = float(np.max(preds))
+    pred_class    = CLASS_NAMES[int(np.argmax(preds))]
+
+    # === خطوة 3: Confidence Threshold ===
+    if confidence < THRESHOLD:
+        return {
+            "status"    : "uncertain",
+            "prediction": "Undefined",
+            "message"   : "الصورة مش واضحة — صوّر تاني في إضاءة أحسن",
+            "confidence": round(confidence, 3),
+            "skin_ratio": round(skin_ratio, 3)
+        }
+
     return {
-        "prediction":class_names[pred.item()],
-        "confidence":confidence_value
+        "status"    : "ok",
+        "prediction": pred_class,
+        "message"   : "تم التشخيص بنجاح",
+        "confidence": round(confidence, 3),
+        "skin_ratio": round(skin_ratio, 3),
+        "all_probs" : {
+            CLASS_NAMES[i]: round(float(preds[i]), 3)
+            for i in range(len(CLASS_NAMES))
+        }
     }
